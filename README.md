@@ -103,10 +103,8 @@ Start the Streamlit application:
 ```bash
 streamlit run app.py
 ```
-
-Open `http://localhost:8501` in your browser.
-
----
+Streamlit app Link 
+https://smartragresearchagent-37wquncruwret9veb4c8ud.streamlit.app/ 
 
 ## 📊 RAGAS Evaluation Details
 
