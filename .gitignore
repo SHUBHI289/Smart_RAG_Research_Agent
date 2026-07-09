@@ -1,0 +1,36 @@
+# Python caching
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.ipynb_checkpoints/
+
+# Virtual environment
+venv/
+.venv/
+env/
+
+# Environment secrets
+.env
+.env.local
+.env.development
+.env.production
+
+# App data and state (local data)
+uploads/*
+!uploads/.gitkeep
+data/*
+!data/.gitkeep
+vector_store/
+logs/*
+!logs/.gitkeep
+
+# IDE files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
