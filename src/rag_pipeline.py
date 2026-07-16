@@ -164,7 +164,13 @@ class RAGPipeline:
                     answer = response.content
                 except Exception as inner_e:
                     logger.error(f"Fallback Gemini LLM invocation failed: {str(inner_e)}")
-                    raise RuntimeError(f"Error during response generation: {str(inner_e)}")
+                    try:
+                        import google.generativeai as genai
+                        genai.configure(api_key=llm_manager.api_key)
+                        models = [m.name.replace("models/", "") for m in genai.list_models()]
+                    except Exception as list_err:
+                        models = [f"Failed to list: {str(list_err)}"]
+                    raise RuntimeError(f"Error during response generation: {str(inner_e)}. Available models: {models}")
             else:
                 logger.error(f"Gemini LLM invocation failed: {str(e)}")
                 raise RuntimeError(f"Error during response generation: {str(e)}")
@@ -268,7 +274,13 @@ class RAGPipeline:
                         yield {"type": "chunk", "text": chunk_text}
                 except Exception as inner_e:
                     logger.error(f"Fallback Gemini LLM streaming failed: {str(inner_e)}")
-                    raise RuntimeError(f"Error during response streaming: {str(inner_e)}")
+                    try:
+                        import google.generativeai as genai
+                        genai.configure(api_key=llm_manager.api_key)
+                        models = [m.name.replace("models/", "") for m in genai.list_models()]
+                    except Exception as list_err:
+                        models = [f"Failed to list: {str(list_err)}"]
+                    raise RuntimeError(f"Error during response streaming: {str(inner_e)}. Available models: {models}")
             else:
                 logger.error(f"Gemini LLM streaming failed: {str(e)}")
                 raise RuntimeError(f"Error during response streaming: {str(e)}")
