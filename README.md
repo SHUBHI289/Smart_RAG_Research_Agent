@@ -1,6 +1,6 @@
 # Smart Research Assistant (RAG-Based Knowledge System)
 
-[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://smartragresearchagent-37wquncruwret9veb4c8ud.streamlit.app/)
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)]((https://smartragresearchagent-37wquncruwret9veb4c8ud.streamlit.app/))
 
 The **Smart Research Assistant** is a production-ready Retrieval-Augmented Generation (RAG) application that allows users to upload document collections (PDF, TXT) and web page URLs to build a dynamic knowledge base. Users can ask natural language questions and receive accurate, context-grounded responses powered by Google's Gemini 2.5 Flash, complete with highlighted source citations, similarity scores, and automated RAGAS evaluation.
 
@@ -107,7 +107,7 @@ Start the Streamlit application:
 streamlit run app.py
 ```
 Streamlit app Link 
-https://smartragresearchagent-37wquncruwret9veb4c8ud.streamlit.app/ 
+https://smartragresearchagent-37wquncruwret9veb4c8ud.streamlit.app/
 
 ## 📊 RAGAS Evaluation Details
 
