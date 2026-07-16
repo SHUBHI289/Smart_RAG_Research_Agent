@@ -148,32 +148,40 @@ class RAGPipeline:
                 question=question
             )
             
-        # Run LLM
-        logger.info("Invoking LLM for response generation.")
-        try:
-            response = llm.invoke(prompt_input)
-            answer = response.content
-        except Exception as e:
-            err_msg = str(e).lower()
-            if any(term in err_msg for term in ["429", "quota", "rate_limit", "limit exceeded", "404", "not found", "not supported"]):
-                logger.warning(f"Active model error: {str(e)}. Attempting self-healing model fallback.")
-                llm_manager.switch_to_fallback()
-                llm = llm_manager.get_llm()
-                try:
-                    response = llm.invoke(prompt_input)
-                    answer = response.content
-                except Exception as inner_e:
-                    logger.error(f"Fallback Gemini LLM invocation failed: {str(inner_e)}")
-                    try:
-                        import google.generativeai as genai
-                        genai.configure(api_key=llm_manager.api_key)
-                        models = [m.name.replace("models/", "") for m in genai.list_models()]
-                    except Exception as list_err:
-                        models = [f"Failed to list: {str(list_err)}"]
-                    raise RuntimeError(f"Error during response generation: {str(inner_e)}. Available models: {models}")
-            else:
-                logger.error(f"Gemini LLM invocation failed: {str(e)}")
-                raise RuntimeError(f"Error during response generation: {str(e)}")
+        # Run LLM with self-healing retry loop
+        max_attempts = 5
+        attempt = 0
+        answer = None
+        
+        while attempt < max_attempts:
+            try:
+                response = llm.invoke(prompt_input)
+                answer = response.content
+                break
+            except Exception as e:
+                err_msg = str(e).lower()
+                if any(term in err_msg for term in ["429", "quota", "rate_limit", "limit exceeded", "404", "not found", "not supported"]):
+                    attempt += 1
+                    old_model = llm_manager.primary_model
+                    llm_manager.switch_to_fallback()
+                    new_model = llm_manager.primary_model
+                    
+                    if old_model == new_model:
+                        # Fallback chain exhausted
+                        logger.error(f"Fallback models exhausted. Final error: {str(e)}")
+                        try:
+                            import google.generativeai as genai
+                            genai.configure(api_key=llm_manager.api_key)
+                            models = [m.name.replace("models/", "") for m in genai.list_models()]
+                        except Exception as list_err:
+                            models = [f"Failed to list: {str(list_err)}"]
+                        raise RuntimeError(f"All fallback models failed. Final error: {str(e)}. Available models: {models}")
+                        
+                    logger.warning(f"Error on model {old_model}: {str(e)}. Swapping to fallback model {new_model} and retrying (attempt {attempt}/{max_attempts}).")
+                    llm = llm_manager.get_llm()
+                else:
+                    logger.error(f"Gemini LLM invocation failed with unrecoverable error: {str(e)}")
+                    raise RuntimeError(f"Error during response generation: {str(e)}")
             
         # Save Interaction to Memory
         if use_history:
@@ -253,37 +261,42 @@ class RAGPipeline:
                 question=question
             )
             
-        # Stream response
-        logger.info("Streaming response from Gemini LLM.")
-        full_answer_list = []
-        try:
-            for chunk in llm.stream(prompt_input):
-                chunk_text = chunk.content
-                full_answer_list.append(chunk_text)
-                yield {"type": "chunk", "text": chunk_text}
-        except Exception as e:
-            err_msg = str(e).lower()
-            if any(term in err_msg for term in ["429", "quota", "rate_limit", "limit exceeded", "404", "not found", "not supported"]):
-                logger.warning(f"Active model error during streaming: {str(e)}. Attempting self-healing model fallback.")
-                llm_manager.switch_to_fallback()
-                llm = llm_manager.get_llm()
-                try:
-                    for chunk in llm.stream(prompt_input):
-                        chunk_text = chunk.content
-                        full_answer_list.append(chunk_text)
-                        yield {"type": "chunk", "text": chunk_text}
-                except Exception as inner_e:
-                    logger.error(f"Fallback Gemini LLM streaming failed: {str(inner_e)}")
-                    try:
-                        import google.generativeai as genai
-                        genai.configure(api_key=llm_manager.api_key)
-                        models = [m.name.replace("models/", "") for m in genai.list_models()]
-                    except Exception as list_err:
-                        models = [f"Failed to list: {str(list_err)}"]
-                    raise RuntimeError(f"Error during response streaming: {str(inner_e)}. Available models: {models}")
-            else:
-                logger.error(f"Gemini LLM streaming failed: {str(e)}")
-                raise RuntimeError(f"Error during response streaming: {str(e)}")
+        # Stream response with self-healing retry loop
+        max_attempts = 5
+        attempt = 0
+        
+        while attempt < max_attempts:
+            full_answer_list = []
+            try:
+                for chunk in llm.stream(prompt_input):
+                    chunk_text = chunk.content
+                    full_answer_list.append(chunk_text)
+                    yield {"type": "chunk", "text": chunk_text}
+                break
+            except Exception as e:
+                err_msg = str(e).lower()
+                if any(term in err_msg for term in ["429", "quota", "rate_limit", "limit exceeded", "404", "not found", "not supported"]):
+                    attempt += 1
+                    old_model = llm_manager.primary_model
+                    llm_manager.switch_to_fallback()
+                    new_model = llm_manager.primary_model
+                    
+                    if old_model == new_model:
+                        # Fallback chain exhausted
+                        logger.error(f"Fallback models exhausted during streaming. Final error: {str(e)}")
+                        try:
+                            import google.generativeai as genai
+                            genai.configure(api_key=llm_manager.api_key)
+                            models = [m.name.replace("models/", "") for m in genai.list_models()]
+                        except Exception as list_err:
+                            models = [f"Failed to list: {str(list_err)}"]
+                        raise RuntimeError(f"All fallback models failed during streaming. Final error: {str(e)}. Available models: {models}")
+                        
+                    logger.warning(f"Error during streaming on model {old_model}: {str(e)}. Swapping to fallback model {new_model} and retrying (attempt {attempt}/{max_attempts}).")
+                    llm = llm_manager.get_llm()
+                else:
+                    logger.error(f"Gemini LLM streaming failed with unrecoverable error: {str(e)}")
+                    raise RuntimeError(f"Error during response streaming: {str(e)}")
             
         full_answer = "".join(full_answer_list)
         

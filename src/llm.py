@@ -66,7 +66,12 @@ class GeminiLLMManager:
         """
         Forcefully switch the active model to the next available fallback model.
         """
-        fallback_chain = ["gemini-2.0-flash", "gemini-2.0-flash-lite"]
+        fallback_chain = [
+            "gemini-2.5-flash-lite", 
+            "gemini-3.1-flash-lite", 
+            "gemini-2.0-flash-lite", 
+            "gemini-2.0-flash"
+        ]
         for model in fallback_chain:
             if model != self.primary_model:
                 logger.warning(f"Quota exceeded or model not found on {self.primary_model}. Switching to fallback: {model}")
