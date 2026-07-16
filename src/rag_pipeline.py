@@ -154,8 +154,20 @@ class RAGPipeline:
             response = llm.invoke(prompt_input)
             answer = response.content
         except Exception as e:
-            logger.error(f"Gemini LLM invocation failed: {str(e)}")
-            raise RuntimeError(f"Error during response generation: {str(e)}")
+            err_msg = str(e).lower()
+            if "429" in err_msg or "quota" in err_msg or "rate_limit" in err_msg or "limit exceeded" in err_msg:
+                logger.warning("Primary model quota/rate limit exceeded. Falling back to gemini-1.5-flash.")
+                llm_manager.switch_to_fallback()
+                llm = llm_manager.get_llm()
+                try:
+                    response = llm.invoke(prompt_input)
+                    answer = response.content
+                except Exception as inner_e:
+                    logger.error(f"Fallback Gemini LLM invocation failed: {str(inner_e)}")
+                    raise RuntimeError(f"Error during response generation: {str(inner_e)}")
+            else:
+                logger.error(f"Gemini LLM invocation failed: {str(e)}")
+                raise RuntimeError(f"Error during response generation: {str(e)}")
             
         # Save Interaction to Memory
         if use_history:
@@ -164,6 +176,8 @@ class RAGPipeline:
         # Run Evaluation (RAGAS)
         eval_scores = {"faithfulness": 0.0, "answer_relevancy": 0.0}
         try:
+            # Re-fetch active LLM in case fallback was triggered
+            llm = llm_manager.get_llm()
             evaluator = RagasEvaluator(llm=llm, embeddings=embeddings)
             contexts = [s["document"].page_content for s in retrieved_sources]
             eval_scores = evaluator.evaluate_response(question, answer, contexts)
@@ -242,8 +256,22 @@ class RAGPipeline:
                 full_answer_list.append(chunk_text)
                 yield {"type": "chunk", "text": chunk_text}
         except Exception as e:
-            logger.error(f"Gemini LLM streaming failed: {str(e)}")
-            raise RuntimeError(f"Error during response streaming: {str(e)}")
+            err_msg = str(e).lower()
+            if "429" in err_msg or "quota" in err_msg or "rate_limit" in err_msg or "limit exceeded" in err_msg:
+                logger.warning("Primary model quota/rate limit exceeded during streaming. Falling back to gemini-1.5-flash.")
+                llm_manager.switch_to_fallback()
+                llm = llm_manager.get_llm()
+                try:
+                    for chunk in llm.stream(prompt_input):
+                        chunk_text = chunk.content
+                        full_answer_list.append(chunk_text)
+                        yield {"type": "chunk", "text": chunk_text}
+                except Exception as inner_e:
+                    logger.error(f"Fallback Gemini LLM streaming failed: {str(inner_e)}")
+                    raise RuntimeError(f"Error during response streaming: {str(inner_e)}")
+            else:
+                logger.error(f"Gemini LLM streaming failed: {str(e)}")
+                raise RuntimeError(f"Error during response streaming: {str(e)}")
             
         full_answer = "".join(full_answer_list)
         
@@ -254,6 +282,8 @@ class RAGPipeline:
         # Run Evaluation (RAGAS)
         eval_scores = {"faithfulness": 0.0, "answer_relevancy": 0.0}
         try:
+            # Re-fetch active LLM in case fallback was triggered
+            llm = llm_manager.get_llm()
             evaluator = RagasEvaluator(llm=llm, embeddings=embeddings)
             contexts = [s["document"].page_content for s in retrieved_sources]
             eval_scores = evaluator.evaluate_response(question, full_answer, contexts)

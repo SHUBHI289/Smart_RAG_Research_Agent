@@ -62,6 +62,15 @@ class GeminiLLMManager:
                 logger.error(f"Failed fallback initialization of model '{self.fallback_model}': {str(fe)}")
                 raise fe
 
+    def switch_to_fallback(self):
+        """
+        Forcefully switch the active model to the fallback gemini-1.5-flash.
+        """
+        if self.primary_model != self.fallback_model:
+            logger.warning(f"Exceeded quota or rate limit on {self.primary_model}. Switching to fallback: {self.fallback_model}")
+            self.primary_model = self.fallback_model
+            self._llm = None
+
     def check_api_key_validity(self) -> bool:
         """
         Runs a minor test query to verify if the API key is working.
