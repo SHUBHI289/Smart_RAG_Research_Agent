@@ -129,8 +129,6 @@ if "last_eval" not in tf.session_state:
     tf.session_state.last_eval = {"faithfulness": 0.0, "answer_relevancy": 0.0}
 if "doc_stats" not in tf.session_state:
     tf.session_state.doc_stats = None
-if "api_key" not in tf.session_state:
-    tf.session_state.api_key = os.environ.get("GOOGLE_API_KEY", "")
 
 # ----------------- SIDEBAR -----------------
 tf.sidebar.markdown("""
@@ -140,20 +138,8 @@ tf.sidebar.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# API Key input
-api_key_input = tf.sidebar.text_input(
-    "Google Gemini API Key",
-    value=tf.session_state.api_key,
-    type="password",
-    help="Enter your Google Gemini API Key. If set in the .env file, it will be loaded automatically."
-)
-if api_key_input != tf.session_state.api_key:
-    tf.session_state.api_key = api_key_input
-    if api_key_input:
-        os.environ["GOOGLE_API_KEY"] = api_key_input
-
 # Instantiate RAG pipeline
-pipeline = RAGPipeline(api_key=tf.session_state.api_key)
+pipeline = RAGPipeline()
 
 # Document Uploads
 tf.sidebar.header("1. Ingestion Sources")
@@ -228,8 +214,8 @@ if clear_chat:
 
 # Build Knowledge Base Logic
 if build_kb:
-    if not tf.session_state.api_key:
-        tf.sidebar.error("Error: Please provide a Google Gemini API Key first.")
+    if not os.environ.get("GOOGLE_API_KEY"):
+        tf.sidebar.error("Error: Please configure the GOOGLE_API_KEY environment variable or secret.")
     else:
         paths_or_urls = []
         if uploaded_files:
