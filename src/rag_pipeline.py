@@ -155,8 +155,8 @@ class RAGPipeline:
             answer = response.content
         except Exception as e:
             err_msg = str(e).lower()
-            if "429" in err_msg or "quota" in err_msg or "rate_limit" in err_msg or "limit exceeded" in err_msg:
-                logger.warning("Primary model quota/rate limit exceeded. Falling back to gemini-1.5-flash.")
+            if any(term in err_msg for term in ["429", "quota", "rate_limit", "limit exceeded", "404", "not found", "not supported"]):
+                logger.warning(f"Active model error: {str(e)}. Attempting self-healing model fallback.")
                 llm_manager.switch_to_fallback()
                 llm = llm_manager.get_llm()
                 try:
@@ -257,8 +257,8 @@ class RAGPipeline:
                 yield {"type": "chunk", "text": chunk_text}
         except Exception as e:
             err_msg = str(e).lower()
-            if "429" in err_msg or "quota" in err_msg or "rate_limit" in err_msg or "limit exceeded" in err_msg:
-                logger.warning("Primary model quota/rate limit exceeded during streaming. Falling back to gemini-1.5-flash.")
+            if any(term in err_msg for term in ["429", "quota", "rate_limit", "limit exceeded", "404", "not found", "not supported"]):
+                logger.warning(f"Active model error during streaming: {str(e)}. Attempting self-healing model fallback.")
                 llm_manager.switch_to_fallback()
                 llm = llm_manager.get_llm()
                 try:
