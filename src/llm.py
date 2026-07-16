@@ -14,7 +14,7 @@ class GeminiLLMManager:
         self.api_key = api_key or os.environ.get("GOOGLE_API_KEY")
         self.temperature = temperature
         self.primary_model = "gemini-2.5-flash"
-        self.fallback_model = "gemini-1.5-flash-latest"
+        self.fallback_model = "gemini-2.0-flash"
         self._llm = None
 
     def get_llm(self) -> ChatGoogleGenerativeAI:
@@ -66,7 +66,7 @@ class GeminiLLMManager:
         """
         Forcefully switch the active model to the next available fallback model.
         """
-        fallback_chain = ["gemini-1.5-flash-latest", "gemini-1.5-flash-002", "gemini-1.5-flash"]
+        fallback_chain = ["gemini-2.0-flash", "gemini-2.0-flash-lite"]
         for model in fallback_chain:
             if model != self.primary_model:
                 logger.warning(f"Quota exceeded or model not found on {self.primary_model}. Switching to fallback: {model}")
