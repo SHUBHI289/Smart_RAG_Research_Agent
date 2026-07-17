@@ -45,7 +45,8 @@ class EmbeddingManager:
             try:
                 self._embeddings = GoogleGenerativeAIEmbeddings(
                     model="models/gemini-embedding-2",
-                    google_api_key=self.api_key
+                    google_api_key=self.api_key,
+                    client_options={"timeout": 300.0}
                 )
                 logger.info("Google GenAI Embeddings initialized successfully.")
                 return self._embeddings

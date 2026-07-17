@@ -1,5 +1,6 @@
 import os
 import shutil
+import time
 from typing import List, Optional, Union
 from langchain_community.vectorstores import FAISS, Chroma
 from langchain_core.embeddings import Embeddings
@@ -9,6 +10,38 @@ from src.utils import logger
 # Base directory for vector storage
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_ROOT_DIR = os.path.join(BASE_DIR, "vector_store")
+
+def _safe_add_documents_with_retry(db, documents_batch: List[Document], max_retries: int = 3, delay: float = 2.0):
+    """
+    Safely adds a batch of documents to a vector store with exponential backoff retries.
+    """
+    for attempt in range(1, max_retries + 1):
+        try:
+            db.add_documents(documents_batch)
+            return
+        except Exception as e:
+            if attempt == max_retries:
+                logger.error(f"Failed to add documents batch after {max_retries} attempts: {str(e)}")
+                raise e
+            logger.warning(f"Error adding documents batch (attempt {attempt}/{max_retries}): {str(e)}. Retrying in {delay}s...")
+            time.sleep(delay)
+            delay *= 2.0
+
+def _safe_create_faiss_with_retry(documents_batch: List[Document], embeddings: Embeddings, max_retries: int = 3, delay: float = 2.0) -> FAISS:
+    """
+    Safely initializes a FAISS index from documents with exponential backoff retries.
+    """
+    for attempt in range(1, max_retries + 1):
+        try:
+            return FAISS.from_documents(documents_batch, embeddings)
+        except Exception as e:
+            if attempt == max_retries:
+                logger.error(f"Failed to initialize FAISS after {max_retries} attempts: {str(e)}")
+                raise e
+            logger.warning(f"Error creating FAISS index (attempt {attempt}/{max_retries}): {str(e)}. Retrying in {delay}s...")
+            time.sleep(delay)
+            delay *= 2.0
+
 
 class VectorStoreManager:
     """
@@ -51,12 +84,12 @@ class VectorStoreManager:
                         allow_dangerous_deserialization=True
                     )
                     for i in range(0, len(documents), batch_size):
-                        db.add_documents(documents[i:i+batch_size])
+                        _safe_add_documents_with_retry(db, documents[i:i+batch_size])
                 else:
                     logger.info("Building a new FAISS index.")
-                    db = FAISS.from_documents(documents[:batch_size], embeddings)
+                    db = _safe_create_faiss_with_retry(documents[:batch_size], embeddings)
                     for i in range(batch_size, len(documents), batch_size):
-                        db.add_documents(documents[i:i+batch_size])
+                        _safe_add_documents_with_retry(db, documents[i:i+batch_size])
                 
                 db.save_local(self.persist_dir)
                 logger.info(f"FAISS index successfully saved to {self.persist_dir}")
@@ -69,7 +102,7 @@ class VectorStoreManager:
                     embedding_function=embeddings
                 )
                 for i in range(0, len(documents), batch_size):
-                    db.add_documents(documents[i:i+batch_size])
+                    _safe_add_documents_with_retry(db, documents[i:i+batch_size])
                 
                 if hasattr(db, "persist"):
                     db.persist()
