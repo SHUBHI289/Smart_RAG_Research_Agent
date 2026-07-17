@@ -27,6 +27,51 @@ class RagasEvaluator:
         """
         try:
             logger.info("Initializing RAGAS wrappers for LLM and Embeddings.")
+            
+            # Monkey-patch generate/agenerate to handle candidate_count > 1 safely
+            original_generate = self.llm.generate
+            original_agenerate = self.llm.agenerate
+            
+            def safe_generate(messages, stop=None, callbacks=None, **kwargs):
+                n = kwargs.pop("n", 1)
+                if "candidate_count" in kwargs:
+                    n = kwargs.pop("candidate_count", 1)
+                if n <= 1:
+                    return original_generate(messages, stop=stop, callbacks=callbacks, **kwargs)
+                
+                logger.info(f"Safe-generation intercept: running {n} sequential calls to Gemini.")
+                results = []
+                for _ in range(n):
+                    results.append(original_generate(messages, stop=stop, callbacks=callbacks, **kwargs))
+                
+                combined_generations = []
+                for res in results:
+                    combined_generations.extend(res.generations)
+                from langchain_core.outputs import LLMResult
+                return LLMResult(generations=combined_generations, llm_output=results[0].llm_output)
+
+            async def safe_agenerate(messages, stop=None, callbacks=None, **kwargs):
+                n = kwargs.pop("n", 1)
+                if "candidate_count" in kwargs:
+                    n = kwargs.pop("candidate_count", 1)
+                if n <= 1:
+                    return await original_agenerate(messages, stop=stop, callbacks=callbacks, **kwargs)
+                
+                logger.info(f"Safe-ageneration intercept: running {n} sequential async calls to Gemini.")
+                results = []
+                for _ in range(n):
+                    results.append(await original_agenerate(messages, stop=stop, callbacks=callbacks, **kwargs))
+                
+                combined_generations = []
+                for res in results:
+                    combined_generations.extend(res.generations)
+                from langchain_core.outputs import LLMResult
+                return LLMResult(generations=combined_generations, llm_output=results[0].llm_output)
+
+            # Bind safe methods to self.llm instance
+            self.llm.generate = safe_generate
+            self.llm.agenerate = safe_agenerate
+            
             self.ragas_llm = LangchainLLMWrapper(langchain_llm=self.llm)
             self.ragas_embeddings = LangchainEmbeddingsWrapper(embeddings=self.embeddings)
             
@@ -34,7 +79,7 @@ class RagasEvaluator:
             faithfulness.llm = self.ragas_llm
             answer_relevancy.llm = self.ragas_llm
             answer_relevancy.embeddings = self.ragas_embeddings
-            logger.info("RAGAS wrappers initialized successfully.")
+            logger.info("RAGAS wrappers initialized successfully with safe candidate fallback.")
         except Exception as e:
             logger.error(f"Failed to wrap LangChain components for RAGAS: {str(e)}")
 
