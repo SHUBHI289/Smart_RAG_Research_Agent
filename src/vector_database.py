@@ -40,6 +40,7 @@ class VectorStoreManager:
 
         logger.info(f"Creating/updating {self.db_type} index with {len(documents)} document chunks.")
         try:
+            batch_size = 100
             if self.db_type == "FAISS":
                 faiss_index_file = os.path.join(self.persist_dir, "index.faiss")
                 if os.path.exists(faiss_index_file):
@@ -49,10 +50,13 @@ class VectorStoreManager:
                         embeddings, 
                         allow_dangerous_deserialization=True
                     )
-                    db.add_documents(documents)
+                    for i in range(0, len(documents), batch_size):
+                        db.add_documents(documents[i:i+batch_size])
                 else:
                     logger.info("Building a new FAISS index.")
-                    db = FAISS.from_documents(documents, embeddings)
+                    db = FAISS.from_documents(documents[:batch_size], embeddings)
+                    for i in range(batch_size, len(documents), batch_size):
+                        db.add_documents(documents[i:i+batch_size])
                 
                 db.save_local(self.persist_dir)
                 logger.info(f"FAISS index successfully saved to {self.persist_dir}")
@@ -64,7 +68,9 @@ class VectorStoreManager:
                     persist_directory=self.persist_dir,
                     embedding_function=embeddings
                 )
-                db.add_documents(documents)
+                for i in range(0, len(documents), batch_size):
+                    db.add_documents(documents[i:i+batch_size])
+                
                 if hasattr(db, "persist"):
                     db.persist()
                 logger.info(f"ChromaDB index successfully saved/updated at {self.persist_dir}")
