@@ -138,8 +138,15 @@ tf.sidebar.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# Instantiate RAG pipeline
-pipeline = RAGPipeline()
+
+
+@tf.cache_resource
+def get_pipeline() -> RAGPipeline:
+    return RAGPipeline()
+
+
+# Instantiate RAG pipeline once and reuse it across reruns.
+pipeline = get_pipeline()
 
 # Document Uploads
 tf.sidebar.header("1. Ingestion Sources")

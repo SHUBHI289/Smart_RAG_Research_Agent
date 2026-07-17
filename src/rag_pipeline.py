@@ -25,6 +25,40 @@ class RAGPipeline:
         self.api_key = api_key or os.environ.get("GOOGLE_API_KEY")
         self.memory_manager = ConversationMemoryManager(window_size=5)
         self.loader = DocumentLoader()
+        self._embeddings_cache: Dict[str, Any] = {}
+        self._vectorstore_cache: Dict[Tuple[str, str], Any] = {}
+        self._retriever_cache: Dict[Tuple[str, str, int], HybridRetriever] = {}
+        self._llm_manager_cache: Dict[float, GeminiLLMManager] = {}
+
+    def _clear_runtime_caches(self):
+        self._embeddings_cache.clear()
+        self._vectorstore_cache.clear()
+        self._retriever_cache.clear()
+        self._llm_manager_cache.clear()
+
+    def _get_embeddings(self, embedding_model: str):
+        if embedding_model not in self._embeddings_cache:
+            embedding_manager = EmbeddingManager(model_name=embedding_model)
+            self._embeddings_cache[embedding_model] = embedding_manager.get_embeddings()
+        return self._embeddings_cache[embedding_model]
+
+    def _get_vectorstore(self, db_type: str, embedding_model: str, embeddings):
+        cache_key = (db_type, embedding_model)
+        if cache_key not in self._vectorstore_cache:
+            vdb_manager = VectorStoreManager(db_type=db_type, embedding_model_name=embedding_model)
+            self._vectorstore_cache[cache_key] = vdb_manager.get_vectorstore(embeddings)
+        return self._vectorstore_cache[cache_key]
+
+    def _get_retriever(self, vectorstore, db_type: str, embedding_model: str, top_k: int):
+        cache_key = (db_type, embedding_model, top_k)
+        if cache_key not in self._retriever_cache:
+            self._retriever_cache[cache_key] = HybridRetriever(vectorstore=vectorstore, top_k=top_k)
+        return self._retriever_cache[cache_key]
+
+    def _get_llm_manager(self, temperature: float):
+        if temperature not in self._llm_manager_cache:
+            self._llm_manager_cache[temperature] = GeminiLLMManager(api_key=self.api_key, temperature=temperature)
+        return self._llm_manager_cache[temperature]
 
     def ingest_sources(
         self, 
@@ -67,6 +101,7 @@ class RAGPipeline:
         # Save to Vector Database
         vdb_manager = VectorStoreManager(db_type=db_type, embedding_model_name=embedding_model)
         vdb_manager.create_or_update_vectorstore(chunks, embeddings)
+        self._clear_runtime_caches()
         
         # Compute stats
         total_pages = sum(1 for doc in all_docs if doc.metadata.get("file_type") == "pdf") or len(all_docs)
@@ -88,6 +123,7 @@ class RAGPipeline:
         """
         vdb_manager = VectorStoreManager(db_type=db_type, embedding_model_name=embedding_model)
         vdb_manager.clear_vectorstore()
+        self._clear_runtime_caches()
         logger.info(f"Database {db_type} for model {embedding_model} cleared.")
 
     def query(
@@ -106,11 +142,9 @@ class RAGPipeline:
         Returns a tuple: (answer, retrieved_sources, evaluation_scores)
         """
         # Load Vector Store
-        embedding_manager = EmbeddingManager(model_name=embedding_model, api_key=self.api_key)
-        embeddings = embedding_manager.get_embeddings()
+        embeddings = self._get_embeddings(embedding_model)
         
-        vdb_manager = VectorStoreManager(db_type=db_type, embedding_model_name=embedding_model)
-        vectorstore = vdb_manager.get_vectorstore(embeddings)
+        vectorstore = self._get_vectorstore(db_type, embedding_model, embeddings)
         
         if vectorstore is None:
             raise ValueError(
@@ -119,7 +153,7 @@ class RAGPipeline:
             )
             
         # Retrieve Sources
-        retriever = HybridRetriever(vectorstore=vectorstore, top_k=top_k)
+        retriever = self._get_retriever(vectorstore, db_type, embedding_model, top_k)
         retrieved_sources = retriever.retrieve(question, search_type=search_type)
         
         if not retrieved_sources:
@@ -132,7 +166,7 @@ class RAGPipeline:
         )
         
         # Load Gemini LLM
-        llm_manager = GeminiLLMManager(api_key=self.api_key, temperature=temperature)
+        llm_manager = self._get_llm_manager(temperature)
         llm = llm_manager.get_llm()
         
         # Choose Prompt and Arguments
@@ -217,11 +251,9 @@ class RAGPipeline:
         Streams response chunks from Gemini LLM.
         """
         # Load Vector Store
-        embedding_manager = EmbeddingManager(model_name=embedding_model, api_key=self.api_key)
-        embeddings = embedding_manager.get_embeddings()
+        embeddings = self._get_embeddings(embedding_model)
         
-        vdb_manager = VectorStoreManager(db_type=db_type, embedding_model_name=embedding_model)
-        vectorstore = vdb_manager.get_vectorstore(embeddings)
+        vectorstore = self._get_vectorstore(db_type, embedding_model, embeddings)
         
         if vectorstore is None:
             raise ValueError(
@@ -230,7 +262,7 @@ class RAGPipeline:
             )
             
         # Retrieve Sources
-        retriever = HybridRetriever(vectorstore=vectorstore, top_k=top_k)
+        retriever = self._get_retriever(vectorstore, db_type, embedding_model, top_k)
         retrieved_sources = retriever.retrieve(question, search_type=search_type)
         
         yield {"type": "sources", "data": retrieved_sources}
@@ -247,7 +279,7 @@ class RAGPipeline:
         )
         
         # Load Gemini LLM
-        llm_manager = GeminiLLMManager(api_key=self.api_key, temperature=temperature)
+        llm_manager = self._get_llm_manager(temperature)
         llm = llm_manager.get_llm()
         
         # Choose Prompt and Arguments
