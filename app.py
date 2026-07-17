@@ -165,7 +165,6 @@ db_choice = tf.sidebar.selectbox(
 embedding_choice = tf.sidebar.selectbox(
     "Embedding Model",
     options=[
-        "google-genai/gemini-embedding-2",
         "sentence-transformers/all-MiniLM-L6-v2",
         "BAAI/bge-small-en-v1.5",
         "BAAI/bge-base-en-v1.5"
