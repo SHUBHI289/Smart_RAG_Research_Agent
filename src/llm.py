@@ -39,7 +39,7 @@ class GeminiLLMManager:
                 google_api_key=self.api_key,
                 temperature=self.temperature,
                 convert_system_message_to_human=True,
-                max_retries=2
+                max_retries=0
             )
             logger.info(f"Initialized ChatGoogleGenerativeAI with model={self.primary_model}")
             return self._llm
@@ -54,7 +54,7 @@ class GeminiLLMManager:
                     google_api_key=self.api_key,
                     temperature=self.temperature,
                     convert_system_message_to_human=True,
-                    max_retries=2
+                    max_retries=0
                 )
                 logger.info(f"Successfully fallback initialized model={self.fallback_model}")
                 return self._llm

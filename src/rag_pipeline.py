@@ -98,7 +98,8 @@ class RAGPipeline:
         search_type: str = "Hybrid",
         top_k: int = 4,
         temperature: float = 0.2,
-        use_history: bool = True
+        use_history: bool = True,
+        run_evaluation: bool = False
     ) -> Tuple[str, List[Dict[str, Any]], Dict[str, float]]:
         """
         Executes a synchronous query on the RAG pipeline.
@@ -189,14 +190,15 @@ class RAGPipeline:
             
         # Run Evaluation (RAGAS)
         eval_scores = {"faithfulness": 0.0, "answer_relevancy": 0.0}
-        try:
-            # Re-fetch active LLM in case fallback was triggered
-            llm = llm_manager.get_llm()
-            evaluator = RagasEvaluator(llm=llm, embeddings=embeddings)
-            contexts = [s["document"].page_content for s in retrieved_sources]
-            eval_scores = evaluator.evaluate_response(question, answer, contexts)
-        except Exception as e:
-            logger.error(f"RAGAS evaluation execution failed: {str(e)}")
+        if run_evaluation:
+            try:
+                # Re-fetch active LLM in case fallback was triggered
+                llm = llm_manager.get_llm()
+                evaluator = RagasEvaluator(llm=llm, embeddings=embeddings)
+                contexts = [s["document"].page_content for s in retrieved_sources]
+                eval_scores = evaluator.evaluate_response(question, answer, contexts)
+            except Exception as e:
+                logger.error(f"RAGAS evaluation execution failed: {str(e)}")
             
         return answer, retrieved_sources, eval_scores
 
@@ -208,7 +210,8 @@ class RAGPipeline:
         search_type: str = "Hybrid",
         top_k: int = 4,
         temperature: float = 0.2,
-        use_history: bool = True
+        use_history: bool = True,
+        run_evaluation: bool = False
     ) -> Generator[Dict[str, Any], None, None]:
         """
         Streams response chunks from Gemini LLM.
@@ -306,13 +309,14 @@ class RAGPipeline:
             
         # Run Evaluation (RAGAS)
         eval_scores = {"faithfulness": 0.0, "answer_relevancy": 0.0}
-        try:
-            # Re-fetch active LLM in case fallback was triggered
-            llm = llm_manager.get_llm()
-            evaluator = RagasEvaluator(llm=llm, embeddings=embeddings)
-            contexts = [s["document"].page_content for s in retrieved_sources]
-            eval_scores = evaluator.evaluate_response(question, full_answer, contexts)
-        except Exception as e:
-            logger.error(f"RAGAS evaluation failed in streaming pipeline: {str(e)}")
+        if run_evaluation:
+            try:
+                # Re-fetch active LLM in case fallback was triggered
+                llm = llm_manager.get_llm()
+                evaluator = RagasEvaluator(llm=llm, embeddings=embeddings)
+                contexts = [s["document"].page_content for s in retrieved_sources]
+                eval_scores = evaluator.evaluate_response(question, full_answer, contexts)
+            except Exception as e:
+                logger.error(f"RAGAS evaluation failed in streaming pipeline: {str(e)}")
             
         yield {"type": "evaluation", "scores": eval_scores}

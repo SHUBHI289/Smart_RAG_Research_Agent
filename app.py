@@ -179,6 +179,13 @@ search_choice = tf.sidebar.selectbox(
     index=0
 )
 
+# Optional Evaluation
+run_evaluation = tf.sidebar.checkbox(
+    "Enable RAGAS Evaluation",
+    value=False,
+    help="Runs automated evaluation on faithfulness and relevancy. Disable this for significantly faster response times."
+)
+
 # Advanced Configuration Expandable
 with tf.sidebar.expander("Advanced Chunking & Model Tuning", expanded=False):
     chunk_size = tf.slider("Chunk Size", min_value=200, max_value=2000, value=1000, step=100)
@@ -316,7 +323,8 @@ with tab_chat:
                     search_type=search_choice,
                     top_k=top_k,
                     temperature=temperature,
-                    use_history=True
+                    use_history=True,
+                    run_evaluation=run_evaluation
                 )
                 
                 full_response = ""
