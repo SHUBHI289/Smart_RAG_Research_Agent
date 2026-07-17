@@ -9,23 +9,23 @@ from src.utils import logger
 class EmbeddingManager:
     """
     Manages embedding model initialization.
-    Supports Google GenAI text-embedding-004 and HuggingFace models.
+    Supports Google GenAI gemini-embedding-2 and HuggingFace models.
     """
     
     SUPPORTED_MODELS = {
-        "google-genai/text-embedding-004": "models/text-embedding-004",
+        "google-genai/gemini-embedding-2": "models/gemini-embedding-2",
         "sentence-transformers/all-MiniLM-L6-v2": "sentence-transformers/all-MiniLM-L6-v2",
         "BAAI/bge-small-en-v1.5": "BAAI/bge-small-en-v1.5",
         "BAAI/bge-base-en-v1.5": "BAAI/bge-base-en-v1.5"
     }
 
-    def __init__(self, model_name: str = "google-genai/text-embedding-004", api_key: Optional[str] = None):
+    def __init__(self, model_name: str = "google-genai/gemini-embedding-2", api_key: Optional[str] = None):
         if model_name not in self.SUPPORTED_MODELS:
             logger.warning(
                 f"Model '{model_name}' is not in supported list. "
-                f"Defaulting to 'google-genai/text-embedding-004'."
+                f"Defaulting to 'google-genai/gemini-embedding-2'."
             )
-            model_name = "google-genai/text-embedding-004"
+            model_name = "google-genai/gemini-embedding-2"
             
         self.model_name = model_name
         self.api_key = api_key or os.environ.get("GOOGLE_API_KEY")
@@ -41,10 +41,10 @@ class EmbeddingManager:
 
         logger.info(f"Initializing embedding model: {self.model_name}")
         
-        if self.model_name == "google-genai/text-embedding-004":
+        if self.model_name == "google-genai/gemini-embedding-2":
             try:
                 self._embeddings = GoogleGenerativeAIEmbeddings(
-                    model="models/text-embedding-004",
+                    model="models/gemini-embedding-2",
                     google_api_key=self.api_key
                 )
                 logger.info("Google GenAI Embeddings initialized successfully.")
