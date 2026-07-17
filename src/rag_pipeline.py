@@ -106,7 +106,7 @@ class RAGPipeline:
         Returns a tuple: (answer, retrieved_sources, evaluation_scores)
         """
         # Load Vector Store
-        embedding_manager = EmbeddingManager(model_name=embedding_model)
+        embedding_manager = EmbeddingManager(model_name=embedding_model, api_key=self.api_key)
         embeddings = embedding_manager.get_embeddings()
         
         vdb_manager = VectorStoreManager(db_type=db_type, embedding_model_name=embedding_model)
@@ -217,7 +217,7 @@ class RAGPipeline:
         Streams response chunks from Gemini LLM.
         """
         # Load Vector Store
-        embedding_manager = EmbeddingManager(model_name=embedding_model)
+        embedding_manager = EmbeddingManager(model_name=embedding_model, api_key=self.api_key)
         embeddings = embedding_manager.get_embeddings()
         
         vdb_manager = VectorStoreManager(db_type=db_type, embedding_model_name=embedding_model)
